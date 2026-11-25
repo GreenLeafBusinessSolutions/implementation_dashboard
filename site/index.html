@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Implementation Pulse: Payroll Go-Lives</title>
+<style>
+:root{--color-fg:#1c2421;--color-fg-muted:#5d6a65;--color-bg:#f7f8f6;--color-panel:#ffffff;--color-border-line:#dfe4e1;--color-ok:#2f6f4f;--color-warn:#a8660a;--color-bad:#b3261e;
+--font-anthropic-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--font-anthropic-serif:Georgia,"Times New Roman",serif;
+--cds-font-size-caption:12.5px;--cds-font-size-body:14.5px;--cds-font-size-heading:19px;--cds-font-size-title:30px;--cds-font-weight-medium:600;
+--cds-gap-xs:4px;--cds-gap-sm:8px;--cds-gap-md:14px;--cds-gap-lg:22px;--cds-gap-xl:36px;--cds-pad-xs:6px;--cds-pad-sm:10px;--cds-pad-md:14px;--cds-pad-lg:18px;--cds-radius:8px;
+--cds-chart-muted:#b9c1bd;--cds-surface-popover:#ffffff;--cds-border:#cfd6d2;--cds-shadow-popover:0 4px 14px rgba(0,0,0,.14)}
+@media (prefers-color-scheme:dark){:root{--color-fg:#e8ece9;--color-fg-muted:#9eaaa5;--color-bg:#141917;--color-panel:#1d2421;--color-border-line:#2f3935;--color-warn:#e0a44a;--color-bad:#f0776e;--cds-chart-muted:#56605c;--cds-surface-popover:#232b28;--cds-border:#3a4541}}
+html,body{margin:0;background:var(--color-bg)}
+body{padding:28px 20px 60px;line-height:1.45}
+.ip{max-width:1280px;margin:0 auto}
+.ip-select{font:inherit;color:inherit;background-color:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:6px 10px}
+.ip-details{border-top:1px solid var(--color-border-line)}
+
+.ip{display:flex;flex-direction:column;gap:var(--cds-gap-xl);color:var(--color-fg);font-family:var(--font-anthropic-sans);font-size:var(--cds-font-size-body)}
+.ip-title{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);margin:0 0 var(--cds-gap-sm)}
+.ip-take{margin:0;max-width:70ch}
+.ip-note{margin:var(--cds-gap-sm) 0 0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.ip-err{margin:0;color:var(--color-bad)}
+.ip-h2{font-size:var(--cds-font-size-heading);font-weight:var(--cds-font-weight-medium);margin:0 0 var(--cds-gap-xs)}
+.ip-sub{margin:0 0 var(--cds-gap-md);color:var(--color-fg-muted);max-width:80ch}
+.ip-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--cds-gap-md)}
+.ip-card{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg)}
+.ip-kpi-n{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);font-variant-numeric:tabular-nums;line-height:1.1}
+.ip-kpi-l{margin-top:var(--cds-gap-xs);font-weight:var(--cds-font-weight-medium)}
+.ip-kpi-d{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.ip-bad{color:var(--color-bad)}
+.ip-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--cds-gap-md);margin-bottom:var(--cds-gap-md)}
+.ip-scroll{overflow-x:auto}
+.ip-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.ip-table th{text-align:left;font-weight:var(--cds-font-weight-medium);color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);padding:var(--cds-pad-xs) var(--cds-pad-sm);border-bottom:1px solid var(--color-border-line);white-space:nowrap}
+.ip-table td{padding:var(--cds-pad-xs) var(--cds-pad-sm);border-bottom:1px solid var(--color-border-line);vertical-align:top}
+.ip-week td{background:var(--color-panel);font-weight:var(--cds-font-weight-medium)}
+.ip-key{display:block;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.ip-num{text-align:right;white-space:nowrap}
+.ip-bar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--color-border-line);margin-right:var(--cds-gap-xs);vertical-align:middle;overflow:hidden}
+.ip-bar span{display:block;height:100%}
+.ip-chip{display:inline-block;border:1px solid var(--color-border-line);border-radius:999px;padding:0 var(--cds-pad-sm);margin:0 var(--cds-gap-xs) var(--cds-gap-xs) 0;font-size:var(--cds-font-size-caption);white-space:nowrap}
+.ip-chip-bad{border-color:var(--color-bad);color:var(--color-bad)}
+.ip-chip-warn{border-color:var(--color-warn);color:var(--color-warn)}
+.ip-wl{position:relative;display:flex;flex-direction:column;gap:var(--cds-gap-sm);min-height:120px}
+.ip-wl-row{display:grid;grid-template-columns:minmax(90px,150px) 1fr minmax(120px,auto);gap:var(--cds-gap-md);align-items:center}
+.ip-wl-track{display:flex;height:16px}
+.ip-wl-seg{height:100%}
+.ip-wl-val{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);font-variant-numeric:tabular-nums}
+.ip-wl-val b{color:var(--color-fg);font-size:var(--cds-font-size-body)}
+.ip-tip{position:absolute;pointer-events:none;background:var(--cds-surface-popover);border:1px solid var(--cds-border);box-shadow:var(--cds-shadow-popover);border-radius:var(--cds-radius);padding:var(--cds-pad-xs) var(--cds-pad-sm);font-size:var(--cds-font-size-caption);white-space:nowrap}
+.ip-legend{display:flex;flex-wrap:wrap;gap:var(--cds-gap-md);color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin-bottom:var(--cds-gap-md)}
+.ip-sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:var(--cds-gap-xs)}
+.ip-details summary{cursor:pointer;font-weight:var(--cds-font-weight-medium);margin:var(--cds-gap-md) 0}
+.ip-table a{color:inherit}
+.ip-ms{display:flex;flex-direction:column;gap:var(--cds-gap-md)}
+.ip-ms-proj{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-md)}
+.ip-ms-head{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs) var(--cds-gap-md);align-items:baseline;margin-bottom:var(--cds-gap-sm)}
+.ip-ms-head a{color:inherit;font-weight:var(--cds-font-weight-medium)}
+.ip-ms-meta{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.ip-ms-strip{display:flex;gap:var(--cds-gap-xs);overflow-x:auto;padding-bottom:var(--cds-gap-xs)}
+.ip-ms-cell{flex:1 0 96px;max-width:150px;border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-xs);font-size:var(--cds-font-size-caption);display:flex;flex-direction:column;gap:var(--cds-gap-xs);justify-content:space-between}
+.ip-ms-pct{font-weight:var(--cds-font-weight-medium);font-size:var(--cds-font-size-body);font-variant-numeric:tabular-nums}
+.ip-ms-fill{height:5px;border-radius:3px;background:var(--color-border-line);overflow:hidden}
+.ip-ms-fill span{display:block;height:100%}
+.ip-ms-done{border-color:var(--color-ok)}
+.ip-ms-na{opacity:.5}
+.ip-ms-na .ip-ms-name{text-decoration:line-through}
+.ip-defs{color:var(--color-fg-muted);max-width:80ch}
+</style>
+</head>
+<body>
+<div class="ip">
+<header id="top">
+<h1 class="ip-title" id="title">Implementation Pulse: payroll go-lives</h1>
+<p class="ip-note">Updated <span id="data-asof">—</span> · <span id="data-age"></span> · refreshes automatically · <a href="#" id="refresh-now">Refresh now</a></p>
+<p class="ip-err" id="stale-warn" hidden>This data is more than 2 hours old. The automatic refresh may have failed; check the Actions tab in GitHub.</p>
+<p class="ip-take" id="takeaway"><b data-draw="k-next30" data-source="kpis" data-field="next30" data-row="0">—</b> payroll go-lives are scheduled in the next 30 days, and <b data-draw="k-at_risk" data-source="kpis" data-field="at_risk" data-row="0">—</b> projects are at risk. Separately, <b data-draw="k-passed_open" data-source="kpis" data-field="passed_open" data-row="0">—</b> projects sit in Passed to CSR without ever being marked Completed.</p>
+<p class="ip-err" id="load-error" hidden>Some of the data failed to load, so parts of this page are blank.</p>
+</header>
+
+<section class="ip-kpis" id="kpis">
+<div class="ip-card" id="kpi-next14"><div class="ip-kpi-n" data-draw="k-next14" data-source="kpis" data-field="next14" data-row="0">—</div><div class="ip-kpi-l">Go-lives, next 14 days</div><div class="ip-kpi-d">Pre go-live projects by estimated first check date</div></div>
+<div class="ip-card" id="kpi-next30"><div class="ip-kpi-n" data-draw="k-next30" data-source="kpis" data-field="next30" data-row="0">—</div><div class="ip-kpi-l">Go-lives, next 30 days</div><div class="ip-kpi-d">Same count, wider window</div></div>
+<div class="ip-card" id="kpi-risk"><div class="ip-kpi-n ip-bad" data-draw="k-at_risk" data-source="kpis" data-field="at_risk" data-row="0">—</div><div class="ip-kpi-l">At risk</div><div class="ip-kpi-d">Close to first check and far from done, or already past it</div></div>
+<div class="ip-card" id="kpi-live"><div class="ip-kpi-n" data-draw="k-live_not_passed" data-source="kpis" data-field="live_not_passed" data-row="0">—</div><div class="ip-kpi-l">Live, not yet passed</div><div class="ip-kpi-d">Payroll has run, project still with implementation</div></div>
+<div class="ip-card" id="kpi-incoming"><div class="ip-kpi-n" data-draw="k-incoming" data-source="kpis" data-field="incoming" data-row="0">—</div><div class="ip-kpi-l">Pending welcome call in CRM</div><div class="ip-kpi-d"><span data-draw="k-no_project" data-source="kpis" data-field="no_project" data-row="0">—</span> with no matching project</div></div>
+<div class="ip-card" id="kpi-passed"><div class="ip-kpi-n" data-draw="k-passed_open" data-source="kpis" data-field="passed_open" data-row="0">—</div><div class="ip-kpi-l">Passed to CSR, never closed</div><div class="ip-kpi-d">Cleanup, not live work</div></div>
+</section>
+
+<section id="coming-up">
+<h2 class="ip-h2" id="coming-up-h">Coming up, by week of first check</h2>
+<p class="ip-sub">Pre go-live and on-hold payroll projects in first check date order, starting <span data-draw="c-recent">—</span> days back so anything that just slipped stays visible. <b data-draw="k-dates_differ" data-source="kpis" data-field="dates_differ" data-row="0">—</b> open projects carry a different first check date in CRM than on the project.</p>
+<div class="ip-row"><select class="ip-select" id="spec-filter" data-draw="spec-select" aria-label="Implementation specialist" data-source="upcoming"></select></div>
+<div class="ip-scroll"><table class="ip-table" id="coming-up-table" data-source="upcoming" data-row-key="key">
+<thead><tr><th data-field="name">Client</th><th data-field="specialist">Specialist</th><th data-field="status">Status</th><th data-field="first_check">Project first check</th><th data-field="crm_first_check">CRM first check</th><th data-field="days_out" class="ip-num">Days out</th><th data-field="pct">Complete</th><th data-field="employees" class="ip-num">EEs</th><th data-field="critical_done" class="ip-num">Critical checks done (of 8)</th><th data-field="flags">Flags</th></tr></thead>
+<tbody data-draw="up-body"></tbody></table></div>
+</section>
+
+<section id="milestones">
+<h2 class="ip-h2" id="milestones-h">Milestones by project</h2>
+<p class="ip-sub">Each upcoming project's milestones in template order from left to right, with the percent complete Zoho Projects shows for each. Milestones marked Not Applicable are greyed out. The specialist filter above applies here too.</p>
+<p class="ip-note" id="milestones-empty" hidden>Milestone detail has not loaded yet. It fills in after the next milestone refresh.</p>
+<div class="ip-ms" id="milestones-list" data-draw="ms-list" data-source="milestone_rows"></div>
+</section>
+
+<section id="issues">
+<h2 class="ip-h2" id="issues-h">Client issues from Cliq</h2>
+<p class="ip-sub"><b data-draw="t-high" data-source="tracker_counts" data-field="high" data-row="0">—</b> client entities are flagged High and <b data-draw="t-watch" data-source="tracker_counts" data-field="watch" data-row="0">—</b> Watch, out of <b data-draw="t-total" data-source="tracker_counts" data-field="total" data-row="0">—</b> tracked since July 1. The notes come from the Cliq client group chats and are reviewed once each weekday morning, not hourly. Priority is a judgment call made in that review, and entities that share a note are grouped.</p>
+<div class="ip-row"><select class="ip-select" id="issue-filter" aria-label="Issue priority"><option value="">High and Watch</option><option value="High">High only</option><option value="Watch">Watch only</option></select></div>
+<div class="ip-scroll"><table class="ip-table" id="issues-table" data-source="issue_groups" data-row-key="id">
+<thead><tr><th data-field="priority">Priority</th><th data-field="client">Client</th><th data-field="entities" class="ip-num">Entities</th><th data-field="status">Tracker status</th><th data-field="first_check">First check</th><th data-field="ims">IMS</th><th data-field="employees" class="ip-num">EEs</th><th data-field="issue">Current issue</th></tr></thead>
+<tbody data-draw="iss-body"></tbody></table></div>
+</section>
+
+<section id="workload">
+<h2 class="ip-h2" id="workload-h">Workload by specialist</h2>
+<p class="ip-sub">Open payroll projects per implementation specialist, with the employee count still to go live. Use it to see who has room before assigning the next client.</p>
+<div class="ip-legend"><span><span class="ip-sw"></span>Pre go-live</span><span><span class="ip-sw"></span>Live, not passed</span><span><span class="ip-sw"></span>On hold</span></div>
+<div class="ip-wl" id="workload-chart" data-draw="wl-chart" data-source="workload">—</div>
+</section>
+
+<section id="pipeline">
+<h2 class="ip-h2" id="pipeline-h">Coming from sales</h2>
+<p class="ip-sub">Zoho CRM deals in the Pending Welcome Call stage, with the project they match and both first check dates side by side.</p>
+<div class="ip-scroll"><table class="ip-table" id="pipeline-table" data-source="pipeline" data-row-key="id">
+<thead><tr><th data-field="deal">Deal</th><th data-field="rep">Rep</th><th data-field="welcome_call_planned">Welcome call planned</th><th data-field="crm_first_check">CRM first check</th><th data-field="project_first_check">Project first check</th><th data-field="employees" class="ip-num">EEs</th><th data-field="bundle">Bundle</th><th data-field="ncp_complete">NCP complete</th><th data-field="project">Project</th><th data-field="check">Check</th></tr></thead>
+<tbody data-draw="pl-body"></tbody></table></div>
+</section>
+
+<section id="pipeline60">
+<h2 class="ip-h2" id="pipeline60-h">Sales pipeline, next 60 days</h2>
+<p class="ip-sub">Zoho CRM deals with an estimated first check in the next 60 days: <b data-draw="p-deals" data-source="pipeline60_totals" data-field="deals" data-row="0">—</b> deals worth <b data-draw="p-revenue" data-source="pipeline60_totals" data-field="revenue" data-row="0">—</b> in projected revenue. It covers the stages from Proposal Presented through First Check Date Push, so it is wider than the Pending Welcome Call list above. Deals with no projected revenue, which is most insurance and 401k deals, are left out.</p>
+<div class="ip-scroll"><table class="ip-table" id="pipeline60-table" data-source="pipeline60" data-row-key="id">
+<thead><tr><th data-field="deal">Deal</th><th data-field="owner">Owner</th><th data-field="stage">CRM stage</th><th data-field="first_check">Est. first check</th><th data-field="projected_revenue" class="ip-num">Projected revenue</th><th data-field="employees" class="ip-num">EEs</th><th data-field="bundle">Bundle</th><th data-field="client_type">Type</th><th data-field="ncp_complete">NCP complete</th><th data-field="current_provider">Current provider</th></tr></thead>
+<tbody data-draw="p60-body"></tbody></table></div>
+</section>
+
+<section id="cleanup">
+<h2 class="ip-h2" id="cleanup-h">Cleanup queue</h2>
+<p class="ip-sub">Projects whose status or fields no longer match reality. Clearing these is what makes the views above trustworthy. A project can appear under more than one issue.</p>
+<div class="ip-scroll"><table class="ip-table" id="cleanup-table" data-source="cleanup" data-row-key="issue">
+<thead><tr><th data-field="issue">Issue</th><th data-field="count" class="ip-num">Projects</th><th data-field="fix">What to do</th></tr></thead>
+<tbody data-draw="cl-body"></tbody></table></div>
+<details class="ip-details" id="cleanup-details"><summary>Every project in the cleanup queue</summary>
+<div class="ip-scroll"><table class="ip-table" id="cleanup-list-table" data-source="cleanup_list" data-row-key="id">
+<thead><tr><th data-field="issue">Issue</th><th data-field="name">Project</th><th data-field="status">Status</th><th data-field="specialist">Specialist</th><th data-field="first_check">First check</th><th data-field="modified">Last updated</th></tr></thead>
+<tbody data-draw="cll-body"></tbody></table></div>
+</details>
+</section>
+
+<details class="ip-details" id="definitions"><summary>How these numbers are defined</summary>
+<div class="ip-defs">
+<p>Scope: Zoho Projects built from the Bundle: New Client Profile Project template (Standard Layout) that are not Completed or Cancelled. HR Technology, Benefit Technology, Open Enrollment, 401K and Cancellation projects are left out.</p><p>Client issues from Cliq come from tracker.json, which is updated separately from the automatic Zoho refresh (as of <span id="tracker-asof">—</span>).</p>
+<p>Pre go-live means the status is Active, In Compliance, Pending Welcome Call, Pending Questionnaire Return or Active - Dual Maintenance. Live, not passed means 1st, 2nd, 3rd or 3+ Payrolls Ran, or Ready to Pass.</p>
+<p>At risk: a pre go-live project whose first check is within <span data-draw="c-riskdays">—</span> days and is under <span data-draw="c-riskpct">—</span>% complete, or whose first check date passed in the last <span data-draw="c-recent">—</span> days. Projects not updated in over <span data-draw="c-stale">—</span> days are treated as stale and counted only in the cleanup queue.</p>
+<p>Critical checks are the eight project checkboxes: Tax Codes Added, Bank Account and Defaults Verified, Mock Payroll Complete, Profiles Assigned, Delivery Setup Complete, Tax Setup Ticket Submitted, Accounting Billing Ticket Submitted and Questionnaire Completed.</p>
+<p>Coming from sales: Zoho CRM deals whose stage is Pending Welcome Call. Insurance and 401k deals are not in that stage, so they do not appear.</p>
+<p>CRM first check is the Estimated First Check Date on the deal. A deal is matched to a project when every word of the deal name, apart from words like LLC, Inc, PRT or Deal, appears in the project name, so a wrong or missing match is possible.</p>
+</div></details>
+</div>
+
+<script>
+(function () {
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  window.d3 = {
+    utcFormat: function (spec) { return function (d) { return spec.replace('%b', MONTHS[d.getUTCMonth()]).replace('%-d', d.getUTCDate()).replace('%Y', d.getUTCFullYear()); }; },
+    format: function () { return function (n) { return Number(n).toLocaleString('en-US'); }; },
+    utcMonday: { floor: function (d) { var x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x; } },
+    rollup: function (arr, reduce, key) { var groups = new Map(); arr.forEach(function (r) { var k = key(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }); var out = new Map(); groups.forEach(function (v, k) { out.set(k, reduce(v)); }); return out; },
+    rollups: function (arr, reduce, key) { return Array.from(window.d3.rollup(arr, reduce, key)); },
+    max: function (arr, f) { var m; arr.forEach(function (r) { var v = f(r); if (v != null && (m === undefined || v > m)) m = v; }); return m; },
+    sum: function (arr, f) { return arr.reduce(function (s, r) { return s + (Number(f(r)) || 0); }, 0); }
+  };
+  var loaders = {}, calcs = {}, draws = {}, listeners = [], cache = {};
+  window.dash = {
+    colors: ['#2f6f4f', '#c9892b', '#9aa3a0'],
+    source: {},
+    loader: function (id, o) { loaders[id] = o; },
+    calc: function (id, o) { calcs[id] = o; },
+    data: function (id) {
+      if (!(id in cache)) {
+        try {
+          if (id in window.dash.source) {
+            var raw = window.dash.source[id];
+            if (loaders[id]) { var r = loaders[id].fn({ answer: raw }); cache[id] = Array.isArray(r) ? r : r.rows; } else cache[id] = raw;
+          } else if (calcs[id]) {
+            cache[id] = calcs[id].fn.apply(null, calcs[id].inputs.map(function (i) { return window.dash.data(i).data; }));
+          } else return { status: 'missing', data: [] };
+        } catch (e) { console.error(id, e); return { status: 'error', data: [] }; }
+      }
+      return { status: 'ok', data: cache[id] };
+    },
+    draw: function (name, fn) {
+      if (fn) { draws[name] = fn; return; }
+      document.querySelectorAll('[data-draw="' + name + '"]').forEach(function (el) { draws[name](el); });
+    },
+    onData: function (fn) { listeners.push(fn); },
+    start: function (source) {
+      window.dash.source = source; cache = {};
+      listeners.forEach(function (fn) { fn(); });
+      Object.keys(draws).forEach(function (n) { window.dash.draw(n); });
+      document.querySelectorAll('#data-asof').forEach(function (el) { el.textContent = source.as_of || ''; });
+    }
+  };
+})();
+
+</script>
+<script>
+
+const RISK_DAYS = 14, RISK_PCT = 50, STALE_DAYS = 120, RECENT_PAST = 30, DAY = 864e5;
+const OFF_TEAM = ['Ina Guinard', 'Cass Zangari', 'Carrie Davis', 'Jade Moya'];
+const ZP = 'https://insight.greenleafbizsolutions.com/portal/greenleafbizsolutions#zp/projects/';
+const ZP_VIEW = '/tasks/custom-view/1384638000007889003/list?group_by=tasklist';
+const ZP_SETS = ['zp_projects'];
+const SOURCES = ZP_SETS.concat(['crm_deals']);
+const parse = (s) => (s ? new Date(s + 'T00:00:00Z') : null);
+const now = () => { const n = new Date(); return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())); };
+const fmtShort = d3.utcFormat('%b %-d'), fmtLong = d3.utcFormat('%b %-d, %Y');
+const fmt = (s) => { const d = parse(s); if (!d) return '—'; return d.getUTCFullYear() === now().getUTCFullYear() ? fmtShort(d) : fmtLong(d); };
+const num = d3.format(',');
+
+const zpLoader = ({answer, args}) => {
+  const list = answer && answer.data && Array.isArray(answer.data.result) ? answer.data.result : answer && Array.isArray(answer.result) ? answer.result : Array.isArray(answer) ? answer : null;
+  if (!list) throw new Error('Zoho Projects did not return a list of projects.');
+  const PRE = ['Active', 'In Compliance', 'Pending Welcome Call', 'Pending Questionnaire Return', 'Active -Dual Maintenance'];
+  const LIVE = ['1st Payroll Ran', '2nd Payroll Ran', '3rd Payroll Ran', '3+ Payrolls Ran', 'Ready to Pass'];
+  const CRIT = ['tax_codes_added', 'bank_account_defaults_verified', 'mock_payroll_complete', 'profiles_assigned', 'delivery_setup_complete', 'tax_setup_ticket_submitted', 'accounting_billing_ticket_submitted', 'questionnaire_completed'];
+  const int = (v) => { const x = parseInt(v, 10); return isNaN(x) ? null : x; };
+  const rows = list.map((p) => {
+    const status = String((p.status && p.status.name) || '').trim();
+    const tasks = p.tasks || {};
+    return {
+      id: String(p.id), key: p.key, name: String(p.name || '').replace(/\s+/g, ' ').trim(), status,
+      phase: PRE.includes(status) ? 'Pre go-live' : LIVE.includes(status) ? 'Live, not passed' : status === 'Passed to CSR' ? 'Passed to CSR' : 'On hold',
+      specialist: (p.implementation_specialist && p.implementation_specialist.full_name) || 'Unassigned',
+      owner: (p.owner && p.owner.full_name) || null,
+      first_check: p.first_check_date || null, tlm_live: p.tlm_live_date || null,
+      pct: Number(p.percent_complete) || 0, tasks_closed: tasks.closed_count || 0, tasks_open: tasks.open_count || 0,
+      employees: int(p.number_of_ee_s), eins: int(p.number_of_ein_s), bundle: p.service_bundle || null, frequency: p.payroll_frequency || null,
+      critical_done: CRIT.filter((k) => p[k] === true).length,
+      created: String(p.created_time || '').slice(0, 10), modified: String(p.modified_time || '').slice(0, 10)
+    };
+  });
+  const q = args && args.query_params;
+  const firstPassedPage = q && String(q.filter || '').includes('1384638000012785035') && q.page === 1;
+  return {rows, truncated: Boolean(q) && rows.length >= (q.per_page || 100) && !firstPassedPage};
+};
+ZP_SETS.forEach((id) => dash.loader(id, {description: 'Keeps the fields this page uses from each Zoho project and sorts each status into a phase.', fn: zpLoader}));
+
+dash.loader('crm_deals', {
+  description: 'Renames the CRM deal fields this page uses.',
+  fn: ({answer}) => {
+    const list = answer && answer.data && Array.isArray(answer.data.data) ? answer.data.data : answer && Array.isArray(answer.data) ? answer.data : [];
+    return list.map((d) => ({
+      id: String(d.id), deal: String(d.Deal_Name || '').trim(), stage: d.Stage, rep: d['Owner.last_name'] || null,
+      crm_first_check: d.Estimated_First_Check_Date || null, actual_first_check: d.Run_Date || null,
+      employees: typeof d.Number_of_Employees === 'number' ? d.Number_of_Employees : null, bundle: d.Product_Bundle || null,
+      ncp_complete: d.NCP_Complete ? 'Yes' : 'No', welcome_call_planned: d.Proposed_Welcome_Call_Date || null, welcome_call_done: d.Welcome_Call_Completed_Date || null
+    }));
+  }
+});
+
+dash.calc('projects', {
+  title: 'Open payroll projects',
+  description: 'Zoho Projects on the New Client Profile (Standard) layout, one row per project.',
+  inputs: ['zp_projects'],
+  fn: (zp_projects) => {
+    const seen = new Set();
+    return [].concat(zp_projects).filter((p) => p && p.key && !seen.has(p.key) && seen.add(p.key));
+  }
+});
+
+dash.calc('crm_matched', {
+  title: 'CRM deals matched to projects',
+  description: 'Each CRM deal with the open project whose name contains every word of the deal name.',
+  inputs: ['crm_deals', 'projects'],
+  fn: (crm_deals, projects) => {
+    const STOP = new Set(['llc', 'inc', 'corp', 'co', 'the', 'deal', 'prt', 'pt', 'hcm', 'payroll', 'basic', 'managed', 'hr', 'technology', 'add', 'on']);
+    const words = (s) => String(s || '').toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, ' ').split(' ').filter((t) => t && !STOP.has(t));
+    const open = (projects || []).map((p) => ({p, w: new Set(words(p.name))}));
+    return (crm_deals || []).map((d) => {
+      const w = words(d.deal);
+      const hits = w.length ? open.filter((o) => w.every((x) => o.w.has(x))).map((o) => o.p).sort((a, b) => (a.created < b.created ? 1 : -1)) : [];
+      const p = hits[0] || null;
+      const match = !p ? 'No project found' : !p.first_check ? 'No date on project' : !d.crm_first_check ? 'No date in CRM' : p.first_check === d.crm_first_check ? 'Dates agree' : 'Dates differ';
+      return Object.assign({}, d, {project: p ? p.key : null, project_id: p ? p.id : null, project_status: p ? p.status : null, project_first_check: p ? p.first_check : null, match});
+    });
+  }
+});
+
+dash.calc('pipeline', {
+  title: 'Pending welcome call',
+  description: 'CRM deals in the Pending Welcome Call stage, soonest CRM first check first.',
+  inputs: ['crm_matched'],
+  fn: (crm_matched) => {
+    const today = now();
+    return (crm_matched || []).filter((d) => d.stage === 'Pending Welcome Call')
+      .map((d) => Object.assign({}, d, {check: d.actual_first_check && parse(d.actual_first_check) < today ? 'Already ran payroll per CRM' : d.match}))
+      .sort((a, b) => ((a.crm_first_check || '9999') < (b.crm_first_check || '9999') ? -1 : 1));
+  }
+});
+
+dash.calc('work', {
+  title: 'Open payroll projects with timing and flags',
+  description: 'Each open payroll project with days to first check, staleness, risk, the CRM first check date and flags.',
+  inputs: ['projects', 'crm_matched'],
+  fn: (projects, crm_matched) => {
+    const today = now();
+    const crm = new Map();
+    (crm_matched || []).forEach((d) => { if (d.project && d.crm_first_check && !crm.has(d.project)) crm.set(d.project, d.crm_first_check); });
+    return (projects || []).map((p) => {
+      const fc = parse(p.first_check);
+      const days_out = fc ? Math.round((fc - today) / DAY) : null;
+      const idle_days = Math.round((today - parse(p.modified)) / DAY);
+      const stale = p.phase !== 'Passed to CSR' && idle_days > STALE_DAYS;
+      const pre = p.phase === 'Pre go-live';
+      const at_risk = pre && !stale && days_out !== null && ((days_out >= 0 && days_out <= RISK_DAYS && p.pct < RISK_PCT) || (days_out < 0 && days_out >= -RECENT_PAST));
+      const crm_first_check = crm.get(p.key) || null;
+      const dates_differ = Boolean(crm_first_check && p.first_check && crm_first_check !== p.first_check);
+      const flags = [];
+      if (at_risk) flags.push('At risk');
+      if (pre && days_out !== null && days_out < 0) flags.push('Past first check');
+      if (dates_differ) flags.push('CRM date differs');
+      if (p.phase === 'On hold') flags.push('On hold');
+      if (p.specialist === 'Unassigned') flags.push('No specialist');
+      if (OFF_TEAM.includes(p.specialist)) flags.push('Specialist off team');
+      return Object.assign({}, p, {days_out, idle_days, stale, at_risk, crm_first_check, dates_differ, flags: flags.join('; ')});
+    });
+  }
+});
+
+dash.calc('upcoming', {
+  title: 'Go-lives coming up',
+  description: 'Pre go-live and on-hold projects with a first check date no more than 30 days back, soonest first.',
+  inputs: ['work'],
+  fn: (work) => (work || [])
+    .filter((r) => (r.phase === 'Pre go-live' || r.phase === 'On hold') && !r.stale && r.days_out !== null && r.days_out >= -RECENT_PAST)
+    .sort((a, b) => a.days_out - b.days_out || (a.key < b.key ? -1 : 1))
+    .map((r) => ({key: r.key, id: r.id, name: r.name, specialist: r.specialist, status: r.status, first_check: r.first_check, crm_first_check: r.crm_first_check, days_out: r.days_out, pct: r.pct, employees: r.employees, critical_done: r.critical_done, flags: r.flags, week: fmtShort(d3.utcMonday.floor(parse(r.first_check)))}))
+});
+
+dash.calc('kpis', {
+  title: 'Headline counts',
+  description: 'Counts behind the cards and the opening sentence.',
+  inputs: ['work', 'pipeline'],
+  fn: (work, pipeline) => {
+    const w = work || [], p = pipeline || [];
+    const live = w.filter((r) => r.phase === 'Pre go-live' && !r.stale && r.days_out !== null && r.days_out >= 0);
+    return [{
+      next14: live.filter((r) => r.days_out <= 14).length,
+      next30: live.filter((r) => r.days_out <= 30).length,
+      at_risk: w.filter((r) => r.at_risk).length,
+      live_not_passed: w.filter((r) => r.phase === 'Live, not passed' && !r.stale).length,
+      passed_open: w.filter((r) => r.phase === 'Passed to CSR').length,
+      incoming: p.length,
+      no_project: p.filter((d) => !d.project).length,
+      dates_differ: w.filter((r) => r.dates_differ && r.phase !== 'Passed to CSR').length
+    }];
+  }
+});
+
+dash.calc('workload', {
+  title: 'Open projects per specialist',
+  description: 'Projects that are not stale and not passed, counted by specialist and phase.',
+  inputs: ['work'],
+  fn: (work) => {
+    const by = new Map();
+    (work || []).filter((r) => !r.stale && r.phase !== 'Passed to CSR').forEach((r) => {
+      const g = by.get(r.specialist) || {specialist: r.specialist, pre: 0, live: 0, hold: 0, total: 0, employees_pre: 0};
+      if (r.phase === 'Pre go-live') { g.pre += 1; g.employees_pre += r.employees || 0; }
+      else if (r.phase === 'Live, not passed') g.live += 1;
+      else g.hold += 1;
+      g.total += 1;
+      by.set(r.specialist, g);
+    });
+    return Array.from(by.values()).sort((a, b) => b.total - a.total || (a.specialist < b.specialist ? -1 : 1));
+  }
+});
+
+dash.calc('cleanup_list', {
+  title: 'Projects needing cleanup',
+  description: 'One row per project and issue.',
+  inputs: ['work'],
+  fn: (work) => {
+    const out = [];
+    const add = (r, issue) => out.push({id: r.key + '-' + (out.filter((o) => o.key === r.key).length + 1), issue, key: r.key, id_project: r.id, name: r.name, status: r.status, specialist: r.specialist, first_check: r.first_check, modified: r.modified});
+    (work || []).forEach((r) => {
+      if (r.phase === 'Passed to CSR') { add(r, 'Passed to CSR, never marked Completed'); return; }
+      if (r.stale) { add(r, 'No activity in 120+ days, still open'); return; }
+      if (r.phase === 'Pre go-live' && r.days_out !== null && r.days_out < 0) add(r, 'First check date passed, still pre go-live');
+      if (r.phase === 'Pre go-live' && r.days_out === null) add(r, 'No first check date');
+      if (OFF_TEAM.includes(r.specialist)) add(r, 'Specialist no longer on implementation');
+      if (r.specialist === 'Unassigned') add(r, 'No specialist assigned');
+    });
+    return out.sort((a, b) => (a.issue < b.issue ? -1 : a.issue > b.issue ? 1 : a.key < b.key ? -1 : 1));
+  }
+});
+
+dash.calc('cleanup', {
+  title: 'Cleanup issues',
+  description: 'How many projects fall under each cleanup issue.',
+  inputs: ['cleanup_list'],
+  fn: (cleanup_list) => {
+    const fix = {
+      'Passed to CSR, never marked Completed': 'Bulk-move to Completed once payroll confirms the handoff.',
+      'No activity in 120+ days, still open': 'Close, cancel, or restart with a real date and owner.',
+      'First check date passed, still pre go-live': 'Update the status, or push the first check date.',
+      'No first check date': 'Add the estimated first check date so it shows in the weekly view.',
+      'Specialist no longer on implementation': 'Reassign the Implementation Specialist field.',
+      'No specialist assigned': 'Assign an Implementation Specialist.'
+    };
+    return d3.rollups(cleanup_list || [], (v) => v.length, (r) => r.issue)
+      .map(([issue, count]) => ({issue, count, fix: fix[issue] || ''}))
+      .sort((a, b) => b.count - a.count);
+  }
+});
+
+dash.calc('tracker_counts', {
+  title: 'Tracker counts',
+  description: 'How many tracked entities carry each issue priority.',
+  inputs: ['tracker'],
+  fn: (tracker) => [{total: tracker.length, high: tracker.filter((r) => r.priority === 'High').length, watch: tracker.filter((r) => r.priority === 'Watch').length}]
+});
+
+dash.calc('issue_groups', {
+  title: 'Open client issues, grouped',
+  description: 'Tracked entities flagged High or Watch, grouped where they share a short name and the same note.',
+  inputs: ['tracker'],
+  fn: (tracker) => {
+    const groups = new Map();
+    tracker.filter((r) => r.priority === 'High' || r.priority === 'Watch').forEach((r) => {
+      const base = String(r.shortname || '').replace(/\s*\(.*$/, '').trim();
+      const k = base + '|' + r.priority + '|' + r.issue;
+      const g = groups.get(k) || {priority: r.priority, shortname: base, names: [], statuses: [], first_check: null, ims: r.ims || null, employees: 0, issue: r.issue};
+      g.names.push(r.client);
+      if (!g.statuses.includes(r.status)) g.statuses.push(r.status);
+      if (r.first_check && (!g.first_check || r.first_check < g.first_check)) g.first_check = r.first_check;
+      g.employees += r.employees || 0;
+      groups.set(k, g);
+    });
+    return Array.from(groups.values())
+      .sort((a, b) => (a.priority === b.priority ? ((a.first_check || '9999') < (b.first_check || '9999') ? 1 : -1) : a.priority === 'High' ? -1 : 1))
+      .map((g, i) => ({id: 'g' + (i + 1), priority: g.priority, client: g.shortname + ' ' + g.names[0] + (g.names.length > 1 ? ' and ' + (g.names.length - 1) + ' more' : ''), entities: g.names.length, status: g.statuses.join(', '), first_check: g.first_check, ims: g.ims, employees: g.employees, issue: g.issue}));
+  }
+});
+
+dash.calc('pipeline60_totals', {
+  title: 'Sales pipeline totals',
+  description: 'Deal count and summed projected revenue for the 60-day pipeline report.',
+  inputs: ['pipeline60'],
+  fn: (pipeline60) => [{deals: pipeline60.length, revenue: Math.round(d3.sum(pipeline60, (d) => d.projected_revenue || 0))}]
+});
+
+dash.calc('milestone_rows', {
+  title: 'Milestones for upcoming projects',
+  description: 'Each milestone of each upcoming project with its percent complete and status, in template order.',
+  inputs: ['milestones', 'upcoming'],
+  fn: (milestones, upcoming) => {
+    const up = new Map((upcoming || []).map((u, i) => [u.key, {u, i}]));
+    return (milestones || []).filter((m) => up.has(m.project_key))
+      .map((m) => { const p = up.get(m.project_key); return {id: m.id, project_key: m.project_key, project_id: p.u.id, project: p.u.name, specialist: p.u.specialist, status: p.u.status, first_check: p.u.first_check, days_out: p.u.days_out, project_pct: p.u.pct, project_order: p.i, order: m.order, milestone: m.milestone, pct: m.pct, milestone_status: m.status}; })
+      .sort((a, b) => a.project_order - b.project_order || a.order - b.order);
+  }
+});
+
+const ok = (id) => { const d = dash.data(id); return d.status === 'ok' && Array.isArray(d.data) ? d.data : null; };
+const link = (r) => { const a = document.createElement('a'); a.href = ZP + (r.id_project || r.id) + ZP_VIEW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = r.name; return a; };
+const cell = (tr, text, cls) => { const td = document.createElement('td'); td.textContent = text === null || text === undefined || text === '' ? '—' : text; if (cls) td.className = cls; tr.appendChild(td); return td; };
+
+['next14', 'next30', 'at_risk', 'live_not_passed', 'passed_open', 'incoming', 'no_project', 'dates_differ'].forEach((f) => {
+  dash.draw('k-' + f, (el) => { const k = ok('kpis'); el.textContent = k && k[0] ? num(k[0][f]) : '—'; });
+});
+dash.draw('c-riskdays', (el) => { el.textContent = RISK_DAYS; });
+dash.draw('c-riskpct', (el) => { el.textContent = RISK_PCT; });
+dash.draw('c-stale', (el) => { el.textContent = STALE_DAYS; });
+dash.draw('c-recent', (el) => { el.textContent = RECENT_PAST; });
+
+let pick = '';
+dash.draw('spec-select', (sel) => {
+  const u = ok('upcoming') || [];
+  const names = Array.from(new Set(u.map((r) => r.specialist))).sort();
+  if (pick && !names.includes(pick)) pick = '';
+  sel.replaceChildren(new Option('All specialists', ''), ...names.map((n) => new Option(n)));
+  sel.value = pick;
+  sel.onchange = () => { pick = sel.value; dash.draw('up-body'); dash.draw('ms-list'); };
+});
+
+dash.draw('up-body', (tb) => {
+  tb.replaceChildren();
+  const u = ok('upcoming');
+  if (!u) return;
+  const rows = u.filter((r) => !pick || r.specialist === pick);
+  const perWeek = d3.rollup(rows, (v) => v.length, (r) => r.week);
+  let wk = null;
+  rows.forEach((r) => {
+    if (r.week !== wk) {
+      wk = r.week;
+      const h = document.createElement('tr'); h.className = 'ip-week';
+      const td = document.createElement('td'); td.colSpan = 10;
+      td.textContent = 'Week of ' + wk + ' (' + perWeek.get(wk) + ')';
+      h.appendChild(td); tb.appendChild(h);
+    }
+    const tr = document.createElement('tr'); tr.dataset.key = r.key;
+    const c = cell(tr, null); c.replaceChildren(link(r));
+    const k = document.createElement('span'); k.className = 'ip-key'; k.textContent = r.key; c.appendChild(k);
+    cell(tr, r.specialist); cell(tr, r.status); cell(tr, fmt(r.first_check)); cell(tr, fmt(r.crm_first_check));
+    cell(tr, r.days_out + 'd', 'ip-num' + (r.days_out < 0 ? ' ip-bad' : ''));
+    const p = document.createElement('td');
+    const bar = document.createElement('span'); bar.className = 'ip-bar';
+    const fill = document.createElement('span'); fill.style.width = Math.max(0, Math.min(100, r.pct)) + '%'; fill.style.background = dash.colors[0];
+    bar.appendChild(fill); p.appendChild(bar); p.appendChild(document.createTextNode(r.pct + '%')); tr.appendChild(p);
+    cell(tr, r.employees === null || r.employees === undefined ? null : num(r.employees), 'ip-num');
+    cell(tr, r.critical_done, 'ip-num');
+    const f = document.createElement('td');
+    (r.flags ? r.flags.split('; ') : []).forEach((t) => {
+      const s = document.createElement('span');
+      s.className = 'ip-chip' + (t === 'At risk' || t === 'Past first check' || t === 'CRM date differs' ? ' ip-chip-bad' : t === 'On hold' ? '' : ' ip-chip-warn');
+      s.textContent = t; f.appendChild(s);
+    });
+    if (!r.flags) f.textContent = '—';
+    tr.appendChild(f); tb.appendChild(tr);
+  });
+});
+
+dash.draw('wl-chart', (el) => {
+  el.replaceChildren();
+  const w = ok('workload');
+  if (!w) { el.textContent = '—'; return; }
+  const max = d3.max(w, (r) => r.total) || 1;
+  const tip = document.createElement('div'); tip.className = 'ip-tip'; tip.hidden = true;
+  const segs = [['pre', dash.colors[0], 'pre go-live'], ['live', dash.colors[1], 'live, not passed'], ['hold', 'var(--cds-chart-muted)', 'on hold']];
+  w.forEach((r) => {
+    const row = document.createElement('div'); row.className = 'ip-wl-row';
+    const name = document.createElement('div'); name.textContent = r.specialist; row.appendChild(name);
+    const track = document.createElement('div'); track.className = 'ip-wl-track';
+    segs.forEach(([key, color, label]) => {
+      if (!r[key]) return;
+      const s = document.createElement('div'); s.className = 'ip-wl-seg';
+      s.style.width = (r[key] / max * 100) + '%'; s.style.background = color;
+      s.onmousemove = (e) => {
+        const b = el.getBoundingClientRect();
+        tip.textContent = r.specialist + ': ' + r[key] + ' ' + label;
+        tip.hidden = false;
+        tip.style.left = Math.max(0, Math.min(e.clientX - b.left + 12, b.width - 200)) + 'px';
+        tip.style.top = (e.clientY - b.top + 12) + 'px';
+      };
+      s.onmouseleave = () => { tip.hidden = true; };
+      track.appendChild(s);
+    });
+    row.appendChild(track);
+    const val = document.createElement('div'); val.className = 'ip-wl-val';
+    const b = document.createElement('b'); b.textContent = r.total; val.appendChild(b);
+    val.appendChild(document.createTextNode(' open: ' + r.pre + ' pre, ' + r.live + ' live, ' + r.hold + ' hold, ' + num(r.employees_pre) + ' EEs to go live'));
+    row.appendChild(val); el.appendChild(row);
+  });
+  el.appendChild(tip);
+});
+
+dash.draw('pl-body', (tb) => {
+  tb.replaceChildren();
+  const p = ok('pipeline');
+  if (!p) return;
+  p.forEach((r) => {
+    const tr = document.createElement('tr'); tr.dataset.key = r.id;
+    cell(tr, r.deal); cell(tr, r.rep); cell(tr, fmt(r.welcome_call_planned)); cell(tr, fmt(r.crm_first_check)); cell(tr, fmt(r.project_first_check));
+    cell(tr, r.employees === null || r.employees === undefined ? null : num(r.employees), 'ip-num');
+    cell(tr, r.bundle); cell(tr, r.ncp_complete);
+    const pc = cell(tr, null);
+    if (r.project_id) pc.replaceChildren(link({id: r.project_id, name: r.project + ' (' + r.project_status + ')'}));
+    const m = cell(tr, null);
+    const s = document.createElement('span');
+    s.className = 'ip-chip' + (r.check === 'Dates agree' ? '' : r.check === 'Dates differ' || r.check === 'Already ran payroll per CRM' ? ' ip-chip-bad' : ' ip-chip-warn');
+    s.textContent = r.check; m.replaceChildren(s);
+    tb.appendChild(tr);
+  });
+});
+
+dash.draw('cl-body', (tb) => {
+  tb.replaceChildren();
+  const c = ok('cleanup');
+  if (!c) return;
+  c.forEach((r) => {
+    const tr = document.createElement('tr');
+    cell(tr, r.issue); cell(tr, num(r.count), 'ip-num'); cell(tr, r.fix); tb.appendChild(tr);
+  });
+});
+
+dash.draw('cll-body', (tb) => {
+  tb.replaceChildren();
+  const c = ok('cleanup_list');
+  if (!c) return;
+  c.forEach((r) => {
+    const tr = document.createElement('tr'); tr.dataset.key = r.id;
+    cell(tr, r.issue);
+    const n = cell(tr, null); n.replaceChildren(link(r));
+    const k = document.createElement('span'); k.className = 'ip-key'; k.textContent = r.key; n.appendChild(k);
+    cell(tr, r.status); cell(tr, r.specialist); cell(tr, fmt(r.first_check)); cell(tr, fmt(r.modified));
+    tb.appendChild(tr);
+  });
+});
+
+dash.draw('ms-list', (el) => {
+  el.replaceChildren();
+  const rows = ok('milestone_rows') || [];
+  document.querySelectorAll('#milestones-empty').forEach((e) => { e.hidden = rows.length > 0; });
+  const byProject = d3.rollups(rows.filter((r) => !pick || r.specialist === pick), (v) => v, (r) => r.project_key);
+  byProject.forEach(([key, ms]) => {
+    const p = ms[0];
+    const box = document.createElement('div'); box.className = 'ip-ms-proj';
+    const head = document.createElement('div'); head.className = 'ip-ms-head';
+    head.appendChild(link({id: p.project_id, name: p.project}));
+    const meta = document.createElement('span'); meta.className = 'ip-ms-meta';
+    const open = ms.filter((m) => m.milestone_status !== 'Not Applicable' && m.pct < 100).length;
+    meta.textContent = key + ' · ' + p.specialist + ' · ' + p.status + ' · first check ' + fmt(p.first_check) + ' (' + p.days_out + 'd) · ' + p.project_pct + '% overall · ' + open + ' milestones not done';
+    head.appendChild(meta); box.appendChild(head);
+    const strip = document.createElement('div'); strip.className = 'ip-ms-strip';
+    ms.forEach((m) => {
+      const na = m.milestone_status === 'Not Applicable';
+      const c = document.createElement('div'); c.className = 'ip-ms-cell' + (na ? ' ip-ms-na' : m.pct >= 100 ? ' ip-ms-done' : '');
+      const n = document.createElement('div'); n.className = 'ip-ms-name'; n.textContent = m.milestone; c.appendChild(n);
+      const b = document.createElement('div');
+      const pc = document.createElement('div'); pc.className = 'ip-ms-pct'; pc.textContent = na ? 'N/A' : m.pct + '%'; b.appendChild(pc);
+      const f = document.createElement('div'); f.className = 'ip-ms-fill';
+      const s = document.createElement('span'); s.style.width = (na ? 0 : Math.max(0, Math.min(100, m.pct))) + '%'; s.style.background = m.pct >= 100 ? 'var(--color-ok)' : dash.colors[0];
+      f.appendChild(s); b.appendChild(f); c.appendChild(b); strip.appendChild(c);
+    });
+    box.appendChild(strip); el.appendChild(box);
+  });
+});
+
+dash.draw('t-high', (el) => { const t = ok('tracker_counts'); el.textContent = t && t[0] ? num(t[0].high) : '—'; });
+dash.draw('t-watch', (el) => { const t = ok('tracker_counts'); el.textContent = t && t[0] ? num(t[0].watch) : '—'; });
+dash.draw('t-total', (el) => { const t = ok('tracker_counts'); el.textContent = t && t[0] ? num(t[0].total) : '—'; });
+dash.draw('p-deals', (el) => { const t = ok('pipeline60_totals'); el.textContent = t && t[0] ? num(t[0].deals) : '—'; });
+dash.draw('p-revenue', (el) => { const t = ok('pipeline60_totals'); el.textContent = t && t[0] ? '$' + num(t[0].revenue) : '—'; });
+
+let issuePick = '';
+document.querySelectorAll('#issue-filter').forEach((sel) => { sel.onchange = () => { issuePick = sel.value; dash.draw('iss-body'); }; });
+dash.draw('iss-body', (tb) => {
+  tb.replaceChildren();
+  const g = ok('issue_groups');
+  if (!g) return;
+  g.filter((r) => !issuePick || r.priority === issuePick).forEach((r) => {
+    const tr = document.createElement('tr'); tr.dataset.key = r.id;
+    const p = cell(tr, null);
+    const s = document.createElement('span'); s.className = 'ip-chip' + (r.priority === 'High' ? ' ip-chip-bad' : ' ip-chip-warn'); s.textContent = r.priority; p.replaceChildren(s);
+    cell(tr, r.client); cell(tr, num(r.entities), 'ip-num'); cell(tr, r.status); cell(tr, fmt(r.first_check)); cell(tr, r.ims);
+    cell(tr, num(r.employees), 'ip-num'); cell(tr, r.issue);
+    tb.appendChild(tr);
+  });
+});
+
+dash.draw('p60-body', (tb) => {
+  tb.replaceChildren();
+  const p = ok('pipeline60');
+  if (!p) return;
+  p.slice().sort((a, b) => ((a.first_check || '9999') < (b.first_check || '9999') ? -1 : (a.first_check || '9999') > (b.first_check || '9999') ? 1 : (b.projected_revenue || 0) - (a.projected_revenue || 0))).forEach((r) => {
+    const tr = document.createElement('tr'); tr.dataset.key = r.id;
+    cell(tr, r.deal); cell(tr, r.owner); cell(tr, r.stage); cell(tr, fmt(r.first_check));
+    cell(tr, r.projected_revenue === null || r.projected_revenue === undefined ? null : '$' + num(Math.round(r.projected_revenue)), 'ip-num');
+    cell(tr, r.employees, 'ip-num'); cell(tr, r.bundle); cell(tr, r.client_type); cell(tr, r.ncp_complete); cell(tr, r.current_provider);
+    tb.appendChild(tr);
+  });
+});
+
+document.querySelectorAll('.ip-sw').forEach((e, i) => { e.style.background = [dash.colors[0], dash.colors[1], 'var(--cds-chart-muted)'][i] || ''; });
+dash.onData(() => {
+  const bad = SOURCES.some((id) => dash.data(id).status === 'error');
+  document.querySelectorAll('#load-error').forEach((e) => { e.hidden = !bad; });
+});
+
+</script>
+<script>
+(function () {
+  const REFRESH_MS = 5 * 60 * 1000;      // re-read data.json every 5 minutes while the page is open
+  const STALE_MS = 2 * 60 * 60 * 1000;   // warn if the last Zoho pull is older than 2 hours
+  let asOf = null;
+  const fmtTime = (d) => d.toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles', timeZoneName: 'short'});
+  const age = () => {
+    if (!asOf) return;
+    const mins = Math.round((Date.now() - asOf) / 60000);
+    document.getElementById('data-age').textContent = mins < 1 ? 'just now' : mins < 60 ? mins + ' min ago' : Math.round(mins / 60) + ' hr ago';
+    document.getElementById('stale-warn').hidden = Date.now() - asOf < STALE_MS;
+  };
+  async function getJSON(url) {
+    const r = await fetch(url + '?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) throw new Error(url + ' ' + r.status);
+    return r.json();
+  }
+  async function load() {
+    try {
+      const [data, tracker] = await Promise.all([getJSON('data.json'), getJSON('tracker.json').catch(() => ({tracker: []}))]);
+      asOf = new Date(data.as_of);
+      data.tracker = tracker.tracker || [];
+      const asOfText = isNaN(asOf) ? String(data.as_of) : fmtTime(asOf);
+      dash.start(Object.assign({}, data, {as_of: asOfText}));
+      document.getElementById('tracker-asof') && (document.getElementById('tracker-asof').textContent = tracker.as_of || '—');
+      if (data.errors && data.errors.length) { const e = document.getElementById('load-error'); e.hidden = false; console.warn(data.errors); }
+      age();
+    } catch (e) {
+      console.error(e);
+      document.getElementById('load-error').hidden = false;
+    }
+  }
+  document.getElementById('refresh-now').onclick = (e) => { e.preventDefault(); load(); };
+  load();
+  setInterval(load, REFRESH_MS);
+  setInterval(age, 60000);
+})();
+</script>
+</body>
+</html>
