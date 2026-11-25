@@ -1,0 +1,55 @@
+name: Refresh dashboard data
+
+on:
+  # Every 20 minutes, 5 AM to 6 PM Pacific (12:00-01:59 UTC), Monday to Friday.
+  # GitHub may start scheduled runs a few minutes late when it is busy.
+  schedule:
+    - cron: "*/20 12-23 * * 1-5"
+    - cron: "*/20 0-1 * * 2-6"
+  # "Run workflow" button in the Actions tab
+  workflow_dispatch:
+  # Lets a Zoho webhook/workflow trigger a refresh right after a project changes
+  repository_dispatch:
+    types: [zoho-update]
+  # Redeploy when the page or tracker.json changes
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull Zoho Projects and CRM
+        env:
+          ZOHO_CLIENT_ID: ${{ secrets.ZOHO_CLIENT_ID }}
+          ZOHO_CLIENT_SECRET: ${{ secrets.ZOHO_CLIENT_SECRET }}
+          ZOHO_REFRESH_TOKEN: ${{ secrets.ZOHO_REFRESH_TOKEN }}
+          ZOHO_DC: ${{ vars.ZOHO_DC || 'com' }}
+        run: python scripts/fetch_data.py
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
